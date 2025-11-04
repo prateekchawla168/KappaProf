@@ -1,6 +1,5 @@
 **/build/*
-**/lib/
 **/tmp/*
 **/test/*
 **/.vscode/*
-
+**/*.csv
