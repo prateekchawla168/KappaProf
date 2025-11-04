@@ -12,12 +12,10 @@ set(SOURCES
     src/utils.cpp
     src/harness.cpp
     src/profiler.cpp
-    src/input_parser.cpp
 )
 
 set(HEADERS
     include/harness.hpp
-    include/input_parser.hpp
     include/profiler.hpp
     include/utils.hpp
 )
