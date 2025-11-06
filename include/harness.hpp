@@ -66,7 +66,7 @@ void BenchmarkResult<T>::DumpCSV() {
         counts_formatted.pop_back();  // remove last comma
 
         /* First counter is hw cycles by default */
-        auto line = std::format("{},{},{},{},{},{},{},{},{}\n", name, m, n, k, alpha, beta, flops, timeDurations[run], counts_formatted);
+        auto line = std::format("{},{},{},{},{:.5f},{:.5f},{},{},{}\n", name, m, n, k, alpha, beta, flops, timeDurations[run], counts_formatted);
 
         csvfile << line;
     }
