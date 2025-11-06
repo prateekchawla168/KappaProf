@@ -41,8 +41,8 @@ find_package(Kokkos REQUIRED CONFIG)
 
 if(Kokkos_FOUND)
     target_include_directories(${TARGET_NAME}
-        PUBLIC
-        ${KokkosKernels_ROOT}/include
+        PRIVATE
+        ${KokkosKernels_ROOT}/include # Kokkos kernels already links against Kokkos!
     )
 else()
     message(ERROR Kokkos_NOTFOUND)
