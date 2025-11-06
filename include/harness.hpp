@@ -61,7 +61,7 @@ class Harness {
 // need to include templated functions in the header itself
 template <typename T>
 BenchmarkResult Harness<T>::RunBenchmark() {
-    std::clog << "Running benchmark for " << test_label << std::endl;
+    // std::clog << "Running benchmark for " << test_label << std::endl;
     // we already have initialized members, we need to get the test harness ready
     std::vector<T> A = generate_random_matrix<T>(m, k);
     std::vector<T> B = generate_random_matrix<T>(k, n);
@@ -83,10 +83,10 @@ BenchmarkResult Harness<T>::RunBenchmark() {
         std::vector<EventType> run_report = m_monitor->GetReport();
         monitor_reports.emplace_back(run_report);
         timeDurations.emplace_back(m_monitor->GetDuration());
-        std::clog << std::format("Completed test {}/{} in {}s.", r + 1, runs + warmupRuns, timeDurations.back()) << std::endl;
+        // std::clog << std::format("Completed test {}/{} in {}s.", r + 1, runs + warmupRuns, timeDurations.back()) << std::endl;
     }
 
-    std::clog << "Completed. " << std::endl;
+    // std::clog << "Completed. " << std::endl;
 
     BenchmarkResult res;
     res.m = m;
@@ -146,7 +146,7 @@ BenchmarkResult KokkosHarness<T>::RunBenchmark() {
     std::vector<std::vector<EventType>> monitor_reports;
     std::vector<long double> timeDurations;
 
-    std::clog << "Running benchmark for " << test_label << std::endl;
+    // std::clog << "Running benchmark for " << test_label << std::endl;
     for (auto r : std::views::iota(0, runs + warmupRuns)) {
         if (r > 0) {
             GenerateRandomView(A);
@@ -160,7 +160,7 @@ BenchmarkResult KokkosHarness<T>::RunBenchmark() {
         std::vector<EventType> run_report = m_monitor->GetReport();
         monitor_reports.emplace_back(run_report);
         timeDurations.emplace_back(m_monitor->GetDuration());
-        std::clog << std::format("Completed test {}/{} in {}s.", r + 1, runs + warmupRuns, timeDurations.back()) << std::endl;
+        // std::clog << std::format("Completed test {}/{} in {}s.", r + 1, runs + warmupRuns, timeDurations.back()) << std::endl;
     }
     std::clog << "Completed. " << std::endl;
 

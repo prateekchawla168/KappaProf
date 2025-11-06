@@ -48,6 +48,7 @@ else()
     message(ERROR Kokkos_NOTFOUND)
 endif()
 
+
 target_include_directories(${TARGET_NAME} 
 PRIVATE
     src
@@ -87,5 +88,7 @@ configure_package_config_file(
     INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${TARGET_NAME}"
 )
 
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
 target_link_libraries(${TARGET_NAME} PUBLIC ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX Kokkos::kokkos)
