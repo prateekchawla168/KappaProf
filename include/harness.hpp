@@ -10,10 +10,14 @@
 #include "profiler.hpp"
 #include "utils.hpp"
 
+template <typename T>
 struct BenchmarkResult {
     int m;
     int n;
     int k;
+    T alpha;
+    T beta;
+
     int runs;
     int warmupRuns;
     std::string name;
@@ -37,7 +41,7 @@ class Harness {
         : m(_m), n(_n), k(_k), runs(_runs), alpha(_alpha), beta(_beta), funcPtr(_funcPtr), test_label(_label) {
         m_monitor = new PerfEvent();
     }
-    BenchmarkResult RunBenchmark();
+    BenchmarkResult<T> RunBenchmark();
 
     ~Harness() {
         // release memory for the monitor instance
@@ -60,7 +64,7 @@ class Harness {
 
 // need to include templated functions in the header itself
 template <typename T>
-BenchmarkResult Harness<T>::RunBenchmark() {
+BenchmarkResult<T> Harness<T>::RunBenchmark() {
     // std::clog << "Running benchmark for " << test_label << std::endl;
     // we already have initialized members, we need to get the test harness ready
     std::vector<T> A = generate_random_matrix<T>(m, k);
@@ -88,10 +92,13 @@ BenchmarkResult Harness<T>::RunBenchmark() {
 
     // std::clog << "Completed. " << std::endl;
 
-    BenchmarkResult res;
+    BenchmarkResult<T> res;
     res.m = m;
     res.n = n;
     res.k = k;
+    res.alpha = alpha;
+    res.beta = beta;
+
     res.runs = runs;
     res.warmupRuns = warmupRuns;
     res.name = test_label;
@@ -114,7 +121,7 @@ class KokkosHarness : public Harness<T> {
         : m(_m), n(_n), k(_k), runs(_runs), warmupRuns(_warmupRuns), alpha(_alpha), beta(_beta), funcPtr(_funcPtr), test_label(_label) {
         m_monitor = new PerfEvent();
     }
-    BenchmarkResult RunBenchmark();
+    BenchmarkResult<T> RunBenchmark();
 
     ~KokkosHarness() {
         // release memory for the monitor instance
@@ -137,7 +144,7 @@ class KokkosHarness : public Harness<T> {
 
 // need to include templated functions in the header itself
 template <typename T>
-BenchmarkResult KokkosHarness<T>::RunBenchmark() {
+BenchmarkResult<T> KokkosHarness<T>::RunBenchmark() {
     // we already have initialized members, we need to get the test harness ready
     Kokkos::View<float**> A("A", m, k);
     Kokkos::View<float**> B("B", k, n);
@@ -164,10 +171,13 @@ BenchmarkResult KokkosHarness<T>::RunBenchmark() {
     }
     // std::clog << "Completed. " << std::endl;
 
-    BenchmarkResult res;
+    BenchmarkResult<T> res;
     res.m = m;
     res.n = n;
     res.k = k;
+    res.alpha = alpha;
+    res.beta = beta;
+
     res.runs = runs;
     res.warmupRuns = warmupRuns;
     res.name = test_label;
