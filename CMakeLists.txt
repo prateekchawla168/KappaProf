@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(KernelProfiler
-        DESCRIPTION
-            "A simple kernel profiling library written in C++"
-        LANGUAGES CXX)
+    DESCRIPTION
+    "A simple kernel profiling library written in C++"
+    LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -35,24 +35,24 @@ set(KokkosKernels_ROOT "$ENV{HOME}/KokkosKernels" CACHE STRING "Install director
 list(APPEND CMAKE_PREFIX_PATH Kokkos_ROOT)
 list(APPEND CMAKE_PREFIX_PATH KokkosKernels_ROOT)
 
-find_package(BLAS REQUIRED) 
-find_package(OpenMP REQUIRED)
+# find_package(BLAS REQUIRED) 
+# find_package(OpenMP REQUIRED)
 find_package(Kokkos REQUIRED CONFIG)
 
-if (Kokkos_FOUND)
-    target_include_directories( ${TARGET_NAME}
-        PUBLIC 
-            ${KokkosKernels_ROOT}/include
+if(Kokkos_FOUND)
+    target_include_directories(${TARGET_NAME}
+        PUBLIC
+        ${KokkosKernels_ROOT}/include
     )
 else()
     message(ERROR Kokkos_NOTFOUND)
 endif()
 
 
-target_include_directories(${TARGET_NAME} 
-PRIVATE
+target_include_directories(${TARGET_NAME}
+    PRIVATE
     src
-PUBLIC
+    PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
@@ -91,4 +91,4 @@ configure_package_config_file(
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
-target_link_libraries(${TARGET_NAME} PUBLIC ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX Kokkos::kokkos)
+target_link_libraries(${TARGET_NAME} PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX Kokkos::kokkos)
