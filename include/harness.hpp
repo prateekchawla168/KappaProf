@@ -162,7 +162,7 @@ BenchmarkResult KokkosHarness<T>::RunBenchmark() {
         timeDurations.emplace_back(m_monitor->GetDuration());
         // std::clog << std::format("Completed test {}/{} in {}s.", r + 1, runs + warmupRuns, timeDurations.back()) << std::endl;
     }
-    std::clog << "Completed. " << std::endl;
+    // std::clog << "Completed. " << std::endl;
 
     BenchmarkResult res;
     res.m = m;
