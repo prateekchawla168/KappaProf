@@ -36,7 +36,7 @@ list(APPEND CMAKE_PREFIX_PATH Kokkos_ROOT)
 list(APPEND CMAKE_PREFIX_PATH KokkosKernels_ROOT)
 
 # find_package(BLAS REQUIRED) 
-# find_package(OpenMP REQUIRED)
+find_package(OpenMP REQUIRED)
 find_package(Kokkos REQUIRED CONFIG)
 
 if(Kokkos_FOUND)

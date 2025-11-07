@@ -224,9 +224,9 @@ class KokkosHarness : public Harness<T> {
 template <typename T>
 BenchmarkResult<T> KokkosHarness<T>::RunBenchmark() {
     // we already have initialized members, we need to get the test harness ready
-    Kokkos::View<float**> A("A", m, k);
-    Kokkos::View<float**> B("B", k, n);
-    Kokkos::View<float**> C("C", m, n);
+    Kokkos::View<T**> A("A", m, k);
+    Kokkos::View<T**> B("B", k, n);
+    Kokkos::View<T**> C("C", m, n);
 
     std::vector<std::vector<EventType>> monitor_reports;
     std::vector<long double> timeDurations;
@@ -234,9 +234,9 @@ BenchmarkResult<T> KokkosHarness<T>::RunBenchmark() {
     // std::clog << "Running benchmark for " << test_label << std::endl;
     for (auto r : std::views::iota(0, runs + warmupRuns)) {
         if (r > 0) {
-            GenerateRandomView(A);
-            GenerateRandomView(B);
-            GenerateRandomView(C);
+            GenerateRandomView<T>(A);
+            GenerateRandomView<T>(B);
+            GenerateRandomView<T>(C);
         }
 
         m_monitor->StartCounters();
