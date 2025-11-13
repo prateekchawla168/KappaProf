@@ -9,15 +9,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(SOURCES
-    src/utils.cpp
-    src/harness.cpp
     src/profiler.cpp
 )
 
 set(HEADERS
-    include/harness.hpp
     include/profiler.hpp
-    include/utils.hpp
 )
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -26,28 +22,6 @@ set(TARGET_NAME KernelProfiler)
 
 add_library(${TARGET_NAME} ${SOURCES} ${HEADERS})
 add_library(${TARGET_NAME}::GEMMProfiler ALIAS ${TARGET_NAME})
-
-
-set(Kokkos_ROOT "$ENV{HOME}/Kokkos" CACHE STRING "Install directory of Kokkos")
-set(KokkosKernels_ROOT "$ENV{HOME}/KokkosKernels" CACHE STRING "Install directory of Kokkos Kernels")
-# we need to find Kokkos here!
-# Assume it is installed in $HOME/Kokkos
-list(APPEND CMAKE_PREFIX_PATH Kokkos_ROOT)
-list(APPEND CMAKE_PREFIX_PATH KokkosKernels_ROOT)
-
-# find_package(BLAS REQUIRED) 
-find_package(OpenMP REQUIRED)
-find_package(Kokkos REQUIRED CONFIG)
-
-if(Kokkos_FOUND)
-    target_include_directories(${TARGET_NAME}
-        PRIVATE
-        ${KokkosKernels_ROOT}/include # Kokkos kernels already links against Kokkos!
-    )
-else()
-    message(ERROR Kokkos_NOTFOUND)
-endif()
-
 
 target_include_directories(${TARGET_NAME}
     PRIVATE
@@ -90,5 +64,3 @@ configure_package_config_file(
 
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
-
-target_link_libraries(${TARGET_NAME} PRIVATE ${BLAS_LIBRARIES} OpenMP::OpenMP_CXX Kokkos::kokkos)
