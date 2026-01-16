@@ -81,19 +81,43 @@ void PerfEvent::PrintReport() {
 }
 
 PerfEvent::PerfEvent() {
-  // for now just manually add everything we can
-  RegisterCounter("cycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES, USER);
-  RegisterCounter("instructions", PERF_TYPE_HARDWARE,
-                  PERF_COUNT_HW_INSTRUCTIONS, USER);
-  RegisterCounter("L1-misses", PERF_TYPE_HW_CACHE,
-                  PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8) |
-                      (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-                  USER);
-  RegisterCounter("LLC-misses", PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,
-                  USER);
-  RegisterCounter("branch-misses", PERF_TYPE_HARDWARE,
-                  PERF_COUNT_HW_BRANCH_MISSES, USER);
   // todo: lookup more counters in linux/perf_event.h
+
+  // prevent formatter from messing with this
+  // clang-format off
+  #define CACHE_MISS_R    ((PERF_COUNT_HW_CACHE_OP_READ  << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16))
+  #define CACHE_MISS_W    ((PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16))
+  #define CACHE_ACCESS_R  ((PERF_COUNT_HW_CACHE_OP_READ  << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16))
+  #define CACHE_ACCESS_W  ((PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16))
+  
+  RegisterCounter("HW-instructions"   , PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS                , USER);
+  RegisterCounter("CPU-cycles"        , PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES                  , USER);
+  RegisterCounter("Branch-instuctions", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS         , USER);
+  RegisterCounter("Branch-misses"     , PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES               , USER);
+  RegisterCounter("Bus-cycles"        , PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES                  , USER);
+  RegisterCounter("Stall-frontend"    , PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND     , USER);
+  RegisterCounter("Stall-backend"     , PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND      , USER);
+  
+  RegisterCounter("L1d-read-miss"     , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_MISS_R    , USER);
+  RegisterCounter("L1d-write-miss"    , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_MISS_W    , USER);
+  RegisterCounter("L1d-read-access"   , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_ACCESS_R  , USER);
+  RegisterCounter("L1d-write-access"  , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_ACCESS_W  , USER);
+  RegisterCounter("L1i-read-miss"     , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_MISS_R    , USER);
+  RegisterCounter("L1i-write-miss"    , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_MISS_W    , USER);
+  RegisterCounter("L1i-read-access"   , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_ACCESS_R  , USER);
+  RegisterCounter("L1i-write-access"  , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_ACCESS_W  , USER);
+  RegisterCounter("LLC-read-miss"     , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_MISS_R    , USER);
+  RegisterCounter("LLC-write-miss"    , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_MISS_W    , USER);
+  RegisterCounter("LLC-read-access"   , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_ACCESS_R  , USER);
+  RegisterCounter("LLC-write-access"  , PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_ACCESS_W  , USER);
+
+  RegisterCounter("Pagefaults-total"  , PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS                 , USER);
+  RegisterCounter("Pagefaults-maj"    , PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ             , USER);
+  RegisterCounter("Pagefaults-min"    , PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN             , USER);
+  RegisterCounter("Alignment-faults"  , PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS            , USER);
+  RegisterCounter("CPU-migrations"    , PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS              , USER);
+
+  // clang-format on
 
   for (size_t i = 0; i < events.size(); i++) {
     auto& event = events[i];
