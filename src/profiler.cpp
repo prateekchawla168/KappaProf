@@ -126,13 +126,26 @@ PerfEvent::PerfEvent() {
     if (event.fd < 0) {
       std::stringstream errmsg;
       errmsg << "Error opening counter " << names[i] << ": " << strerror(errno);
-      throw std::runtime_error(errmsg.str());
-      std::cerr << "Error opening counter " << names[i] << std::endl;
-      events.resize(0);
-      names.resize(0);
-      return;
+      // throw std::runtime_error(errmsg.str());
+
+      std::cerr << "Error opening counter " << names[i] << ": " << errmsg.str()
+                << ". Ignoring this counter on ths current system. "
+                << std::endl;
+      // events.resize(0);
+      // names.resize(0);
+      events.erase(events.begin() + i);
+      names.erase(names.begin() + i);
+      // return;
     }
   }
+
+  // After this loop, if no events remain, throw an error
+  if (events.size() == 0) {
+    names.resize(0);
+    throw std::runtime_error(
+        "No counter is available. Please check your code/system!");
+  }
+  return;
 }
 
 PerfEvent::~PerfEvent() {
