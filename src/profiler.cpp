@@ -1,5 +1,7 @@
 #include "profiler.hpp"
 
+#include <algorithm>  // for std::find
+
 void PerfEvent::RegisterCounter(const std::string& name, uint64_t type,
                                 uint64_t eventID, EventDomain domain = ALL) {
   names.push_back(name);
@@ -123,20 +125,22 @@ PerfEvent::PerfEvent() {
 
   for (size_t i = 0; i < events.size(); i++) {
     auto& event = events[i];
+    auto& name = names[i];
     event.fd =
         static_cast<int>(syscall(SYS_perf_event_open, &event.pe, 0, -1, -1, 0));
     if (event.fd < 0) {
-      std::stringstream errmsg;
-      errmsg << "Error opening counter " << names[i] << ": " << strerror(errno);
-      // throw std::runtime_error(errmsg.str());
-
-      std::cerr << "Error opening counter " << names[i] << ": " << errmsg.str()
+      std::cerr << "Error " << errno << " opening counter " << names[i] << ": "
+                << strerror(errno)
                 << ". Ignoring this counter on ths current system. "
                 << std::endl;
       // events.resize(0);
       // names.resize(0);
-      events.erase(events.begin() + i);
-      names.erase(names.begin() + i);
+      auto it_events = std::find(events.begin(), events.end(), event);
+      auto it_names = std::find(names.begin(), names.end(), name);
+
+      if (it_events != events.end()) events.erase(it_events);
+      if (it_names != names.end()) names.erase(it_names);
+
       // return;
     }
   }
