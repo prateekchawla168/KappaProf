@@ -28,13 +28,15 @@ void PerfEvent::StartCounters() {
     auto ret = ioctl(event.fd, PERF_EVENT_IOC_RESET, 0);
     if (ret == -1) {
       std::stringstream errmsg;
-      errmsg << "PERF_EVENT_IOC_RESET failed! " << strerror(errno);
+      errmsg << "PERF_EVENT_IOC_RESET failed! : " << errno << " "
+             << strerror(errno);
       throw std::runtime_error(errmsg.str());
     }
     ret = ioctl(event.fd, PERF_EVENT_IOC_ENABLE, 0);
     if (ret == -1) {
       std::stringstream errmsg;
-      errmsg << "PERF_EVENT_IOC_ENABLE failed! " << strerror(errno);
+      errmsg << "PERF_EVENT_IOC_ENABLE failed! : " << errno << " "
+             << strerror(errno);
       throw std::runtime_error(errmsg.str());
     }
     if (read(event.fd, &event.prev, sizeof(uint64_t) * 3) !=
