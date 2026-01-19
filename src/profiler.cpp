@@ -85,10 +85,10 @@ void PerfEvent::PrintReport() {
 }
 
 PerfEvent::PerfEvent() {
-  // todo: lookup more counters in linux/perf_event.h
+// todo: lookup more counters in linux/perf_event.h
 
-  // prevent formatter from messing with this
-  // clang-format off
+// prevent formatter from messing with this
+// clang-format off
   #define CACHE_MISS_R    ((PERF_COUNT_HW_CACHE_OP_READ  << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16))
   #define CACHE_MISS_W    ((PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16))
   #define CACHE_ACCESS_R  ((PERF_COUNT_HW_CACHE_OP_READ  << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16))
@@ -131,7 +131,7 @@ PerfEvent::PerfEvent() {
     if (event.fd < 0) {
       std::cerr << "Error " << errno << " opening counter " << names[i] << ": "
                 << strerror(errno)
-                << ". Ignoring this counter on ths current system. "
+                << ". Ignoring this counter on the current system. "
                 << std::endl;
       // events.resize(0);
       // names.resize(0);
