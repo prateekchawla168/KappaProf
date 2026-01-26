@@ -12,6 +12,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class EventType {
@@ -48,22 +49,25 @@ class PerfEvent {
     // simplest method is to normalize wrt timeEnabled/timeElapsed
     struct EventDataFormat {
       uint64_t value;
-      uint64_t id;
       uint64_t timeEnabled;
       uint64_t timeElapsed;
+      // uint64_t id;
     } prev, data;
 
     perf_event_attr pe;
     int fd;
+    int leaderFD;
+    bool isLeader;
 
     long double readCounter() {
-      long double multiplexingCorrection =
-          static_cast<double>(data.timeEnabled - prev.timeEnabled) /
-          (data.timeElapsed - prev.timeElapsed);
-      if ((data.timeElapsed - prev.timeElapsed) == 0)
-        multiplexingCorrection = 1.0;
-      return static_cast<long double>(data.value - prev.value) *
-             multiplexingCorrection;
+      // long double multiplexingCorrection =
+      //     static_cast<double>(data.timeEnabled - prev.timeEnabled) /
+      //     (data.timeElapsed - prev.timeElapsed);
+      // if ((data.timeElapsed - prev.timeElapsed) == 0)
+      //   multiplexingCorrection = 1.0;
+      // return static_cast<long double>(data.value - prev.value) *
+      //        multiplexingCorrection;
+      return static_cast<long double>(data.value);
     }
 
     // Need a slightly better way to do this
@@ -80,17 +84,24 @@ class PerfEvent {
     ALL = 0b111
   };
 
-  void RegisterCounter(const std::string&, uint64_t, uint64_t, EventDomain);
+  void RegisterCounter(const std::string&, int&, uint64_t, uint64_t,
+                       EventDomain);
 
   void StartCounters();
 
   void StopCounters();
 
+  void ReadCounterList(const std::string&);
+
+  std::vector<std::string> GetCounterNames() { return names; }
+
   long double GetCounter(const std::string&);
 
   long double GetDuration() {
     // returns nanoseconds by default
-    return std::chrono::duration<long double>(stopTime - startTime).count();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime -
+                                                                startTime)
+        .count();
   }
 
   long double GetIPC() {
@@ -108,18 +119,24 @@ class PerfEvent {
            (long double)GetCounter("task-clock");
   }
 
-  std::vector<EventType> GetReport(long double);
-  std::vector<EventType> GetReport() { return this->GetReport(1.0); };
-
+  std::vector<EventType> GetReport(long double, bool);
+  std::vector<EventType> GetReport() { return this->GetReport(1.0, false); };
+  std::vector<EventType> GetOverhead();
   void PrintReport();
+  void PrintReport(std::vector<EventType>);
 
   PerfEvent();
-
+  PerfEvent(const std::string&);
   ~PerfEvent();
+
+ private:
+  void ConstructTypeMap();
+  int TypeLookup(const std::string&);
 
  private:
   std::vector<Event> events;
   std::vector<std::string> names;
+  std::unordered_map<std::string, int> typeMap;
   std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
   std::chrono::time_point<std::chrono::high_resolution_clock> stopTime;
 };
