@@ -14,6 +14,7 @@ set(SOURCES
 
 set(HEADERS
     include/profiler.hpp
+    include/ErrorHandler.hpp
 )
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -21,7 +22,15 @@ set(CMAKE_BUILD_TYPE Debug)
 set(TARGET_NAME KernelProfiler)
 
 add_library(${TARGET_NAME} ${SOURCES} ${HEADERS})
-add_library(${TARGET_NAME}::GEMMProfiler ALIAS ${TARGET_NAME})
+
+option(BUILD_DEMO "Build demo executable for the library" OFF)
+if(BUILD_DEMO)
+    add_subdirectory(demo)
+
+    target_link_libraries(${TARGET_NAME}_demo ${TARGET_NAME})
+
+endif()
+
 
 target_include_directories(${TARGET_NAME}
     PRIVATE
