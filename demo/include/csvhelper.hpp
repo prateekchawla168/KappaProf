@@ -48,7 +48,7 @@ void DumpTimeToCSV(std::string filename, int iteration, long long time) {
 
   csvfile.seekp(0, std::ios::end);
   bool is_empty = (csvfile.tellp() == 0);
-  if (is_empty) csvfile << "runID,time";
+  if (is_empty) csvfile << "runID,time" << std::endl;
 
   std::string data;
   data.append(std::to_string(iteration));
