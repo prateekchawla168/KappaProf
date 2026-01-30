@@ -47,37 +47,24 @@ void driver(driven drivee, std::string label = "", int runs = 100,
 
 void driver_dyn(driven_dynamic drivee, std::string label = "",
                 int init_runs = 100, bool progress = true) {
-  for (size_t j = 1; j < init_runs; ++j) {
+  for (size_t j = 1; j <= init_runs; ++j) {
     for (auto i = 0; i < 100; i++) {
-      {
-        PerfEvent monitor(label);
-        size_t time;
-        drivee(monitor, time, j);
-        auto report = monitor.GetReport(true);
-        // monitor.PrintReport(report);
-        DumpCSV(label + "_hwdata.csv", report);
-        DumpTimeToCSV(label + "_hwtime.csv", i, time);
-      }
-
-      {
-        PerfEvent monitor("cachegroup.csv");
-        size_t time;
-        drivee(monitor, time, j);
-        auto report = monitor.GetReport(true);
-        // monitor.PrintReport(report);
-        DumpCSV(label + "_cachedata.csv", report);
-        DumpTimeToCSV(label + "_cachetime.csv", j, time);
-      }
+      PerfEvent monitor("cachegroup.csv");
+      size_t time;
+      drivee(monitor, time, j);
+      auto report = monitor.GetReport(true);
+      // monitor.PrintReport(report);
+      DumpCSV(label + "_cachedata.csv", report);
+      DumpTimeToCSV(label + "_cachetime.csv", j, time);
     }
 
     if (progress)
-      std::cout << "Completed " << j + 1 << "/" << init_runs
-                << "iterations. \r";
+      std::cout << "Completed " << j << "/" << init_runs << "iterations. \r";
   }
 }
 
 int main(int argc, char* argv[]) {
-  int runs = 1000;
+  int runs = 10;
   // driver(dgemm_kernel, "datafiles/dgemm", runs, true);
   // driver(ddot_kernel, "datafiles/ddot", runs, true);
   // driver(fftw_kernel, "datafiles/fftw", runs, true);
