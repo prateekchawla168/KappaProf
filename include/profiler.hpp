@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <iostream>
@@ -17,11 +18,11 @@
 
 class EventType {
  private:
-  std::pair<std::string, long double> item;
+  std::pair<std::string, uint64_t> item;
 
  public:
   /// we need to copy the name!
-  EventType(std::string _name, long double _count) {
+  EventType(std::string _name, uint64_t _count) {
     item.first = _name;
     item.second = _count;
   }
@@ -33,46 +34,45 @@ class EventType {
 
   std::string GetName() { return item.first; }
 
-  long double GetCount() { return item.second; }
+  long long GetCount() { return item.second; }
 
   void SetName(std::string _name) { item.first = _name; }
 
-  void SetCount(long double _count) { item.second = _count; }
+  void SetCount(uint64_t _count) { item.second = _count; }
 
   size_t GetSize() { return sizeof(item); }
+};
+
+struct ReadFormat {
+  uint64_t nr;
+  struct {
+    uint64_t value;
+    uint64_t id;
+  } values[10];
 };
 
 class PerfEvent {
  public:
   struct Event {
-    // since we multiplex events, we need to correct for this.
-    // simplest method is to normalize wrt timeEnabled/timeElapsed
     struct EventDataFormat {
       uint64_t value;
-      uint64_t timeEnabled;
-      uint64_t timeElapsed;
-      // uint64_t id;
-    } prev, data;
+    } data;
 
     perf_event_attr pe;
     int fd;
     int leaderFD;
     bool isLeader;
+    int numCounters;
+    uint64_t id;
 
-    long double readCounter() {
-      // long double multiplexingCorrection =
-      //     static_cast<double>(data.timeEnabled - prev.timeEnabled) /
-      //     (data.timeElapsed - prev.timeElapsed);
-      // if ((data.timeElapsed - prev.timeElapsed) == 0)
-      //   multiplexingCorrection = 1.0;
-      // return static_cast<long double>(data.value - prev.value) *
-      //        multiplexingCorrection;
-      return static_cast<long double>(data.value);
-    }
+    uint64_t readCounter() { return data.value; }
+    inline void SetData(uint64_t v) { data.value = v; }
 
-    // Need a slightly better way to do this
-    bool operator==(const Event& other) const {
-      return pe.config == other.pe.config;
+    Event() {
+      fd = -1;
+      leaderFD = -1;
+      isLeader = false;
+      numCounters = 0;
     }
   };
 
@@ -91,37 +91,19 @@ class PerfEvent {
 
   void StopCounters();
 
-  void ReadCounterList(const std::string&);
-
   std::vector<std::string> GetCounterNames() { return names; }
 
-  long double GetCounter(const std::string&);
+  uint64_t GetCounter(const std::string&);
 
-  long double GetDuration() {
+  uint64_t GetDuration() {
     // returns nanoseconds by default
     return std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime -
                                                                 startTime)
         .count();
   }
 
-  long double GetIPC() {
-    return (long double)GetCounter("instructions") /
-           (long double)GetCounter("cycles");
-  }
-
-  long double GetCPUs() {
-    return (long double)GetCounter("task-clock") /
-           (long double)(GetDuration() * 1e9);
-  }
-
-  long double GetAvgGHz() {
-    return (long double)GetCounter("cycles") /
-           (long double)GetCounter("task-clock");
-  }
-
-  std::vector<EventType> GetReport(long double, bool);
-  std::vector<EventType> GetReport() { return this->GetReport(1.0, false); };
-  std::vector<EventType> GetOverhead();
+  std::vector<EventType> GetReport(bool);  // todo: de-idiotify
+  std::vector<EventType> GetReport() { return this->GetReport(false); };
   void PrintReport();
   void PrintReport(std::vector<EventType>);
 
@@ -132,10 +114,15 @@ class PerfEvent {
  private:
   void ConstructTypeMap();
   int TypeLookup(const std::string&);
+  std::vector<EventType> GetOverhead();
+  void ReadCounterList(const std::string&);
+  void ReadEnvConfig(bool, bool&, std::string&);
+  void ParseEnvConfig(std::string&);
 
  private:
   std::vector<Event> events;
   std::vector<std::string> names;
+  std::vector<int> leaderFDs;
   std::unordered_map<std::string, int> typeMap;
   std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
   std::chrono::time_point<std::chrono::high_resolution_clock> stopTime;
