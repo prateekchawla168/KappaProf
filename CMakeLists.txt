@@ -17,7 +17,10 @@ set(HEADERS
     include/ErrorHandler.hpp
 )
 
-set(CMAKE_BUILD_TYPE Debug)
+# tmp stuff for now, delete later
+set(CMAKE_BUILD_TYPE MinSizeRel)
+
+# set(CMAKE_CXX_FLAGS "-fsanitize=undefined")
 
 set(TARGET_NAME KernelProfiler)
 
