@@ -1,6 +1,7 @@
 #include "profiler.hpp"
 
 #include <algorithm>  // for std::find
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 
@@ -15,12 +16,9 @@
 #define CACHE_ACCESS_P  ((PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16))
 // clang-format on
 
-void PerfEvent::RegisterCounter(const std::string& name, int& leaderFD,
+void PerfEvent::RegisterCounter(const std::string& name, int& leader_FD,
                                 uint64_t type, uint64_t eventID,
                                 EventDomain domain = ALL) {
-  // names.push_back(name);
-  // events.push_back(Event());
-  // auto& event = events.back();
   auto event = Event();
   auto& pe = event.pe;
   memset(&pe, 0, sizeof(struct perf_event_attr));
@@ -34,21 +32,19 @@ void PerfEvent::RegisterCounter(const std::string& name, int& leaderFD,
   pe.exclude_user = !(domain & USER);
   pe.exclude_kernel = !(domain & KERNEL);
   pe.exclude_hv = !(domain & HYPERVISOR);
-  pe.exclude_idle = 1;
-  pe.read_format =
-      PERF_FORMAT_TOTAL_TIME_ENABLED | PERF_FORMAT_TOTAL_TIME_RUNNING;
+  pe.read_format = PERF_FORMAT_ID | PERF_FORMAT_GROUP;
 
-  event.isLeader = (leaderFD == -1) ? true : false;
+  event.isLeader = (leader_FD == -1) ? true : false;
 
   bool secondCallWasNeeded = false;
 
   event.fd = static_cast<int>(
-      syscall(SYS_perf_event_open, &event.pe, 0, -1, leaderFD, 0));
+      syscall(SYS_perf_event_open, &event.pe, 0, -1, leader_FD, 0));
   if (event.fd < 0) {
     if (errno == 22) {
       std::cerr << "Could not open " << name
                 << " with the specified leader. "
-                   "Rettempting as leader."
+                   "Re-attempting as leader."
                 << std::endl;
       event.fd = static_cast<int>(
           syscall(SYS_perf_event_open, &event.pe, 0, -1, -1, 0));
@@ -62,74 +58,183 @@ void PerfEvent::RegisterCounter(const std::string& name, int& leaderFD,
                 << std::endl;
     }
   } else {
+    if (event.isLeader) {
+      event.leaderFD = event.fd;
+      leader_FD = event.fd;  // send this to the next call to RegisterCounter
+      // set the id of this thing to whatever we need, and set contained objects
+      // to 1
+      event.numCounters = 1;
+      leaderFDs.push_back(event.fd);
+
+    } else {
+      event.leaderFD = leader_FD;
+      // this is not the leader -> find it!
+      for (auto i = 0; i < events.size(); ++i) {
+        if (events[i].fd == leader_FD) {
+          events[i].numCounters++;
+          break;
+        }
+      }
+    }
+    // we managed to get the event, so syscall for its id
+    auto ret = ioctl(event.fd, PERF_EVENT_IOC_ID, &event.id);
+    if (ret == -1) {
+      std::stringstream errmsg;
+      errmsg << "PERF_EVENT_IOC_ID failed for " << name << "! : " << errno
+             << " " << DescribeError_IOCTL(errno);
+      throw std::runtime_error(errmsg.str());
+    }
+
     events.push_back(event);
     names.push_back(name);
     // event was successfully added
-    if (event.isLeader) {
-      event.leaderFD = event.fd;
-      leaderFD = event.fd;  // send this to the next call to RegisterCounter
-    } else {
-      event.leaderFD = leaderFD;
-    }
   }
 }
 
 void PerfEvent::StartCounters() {
   // could use a std::for_each but we need the index.
   // TODO: Define an enumerate()?
-  for (size_t i = 0; i < events.size(); i++) {
-    auto& event = events[i];
-    auto& name = names[i];
-    auto ret = ioctl(event.fd, PERF_EVENT_IOC_RESET, 0);
+  // for (size_t i = 0; i < events.size(); i++) {
+  //   auto& event = events[i];
+  //   if (!event.isLeader) continue;
+  //   auto& name = names[i];
+  //   auto ret = ioctl(event.fd, PERF_EVENT_IOC_RESET, 0);
+  //   if (ret == -1) {
+  //     std::stringstream errmsg;
+  //     errmsg << "PERF_EVENT_IOC_RESET failed for " << name << "! : " << errno
+  //            << " " << DescribeError_IOCTL(errno);
+  //     throw std::runtime_error(errmsg.str());
+  //   }
+  //   startTime = std::chrono::high_resolution_clock::now();
+  //   ret = ioctl(event.fd, PERF_EVENT_IOC_ENABLE, 0);
+  //   if (ret == -1) {
+  //     std::stringstream errmsg;
+  //     errmsg << "PERF_EVENT_IOC_ENABLE failed for " << name << "! : " <<
+  //     errno
+  //            << " " << DescribeError_IOCTL(errno);
+  //     throw std::runtime_error(errmsg.str());
+  //   }
+  // }
+
+  for (auto& fd : leaderFDs) {
+    auto ret = ioctl(fd, PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP);
     if (ret == -1) {
       std::stringstream errmsg;
-      errmsg << "PERF_EVENT_IOC_RESET failed for " << name << "! : " << errno
+      errmsg << "PERF_EVENT_IOC_RESET failed for " << fd << "! : " << errno
              << " " << DescribeError_IOCTL(errno);
       throw std::runtime_error(errmsg.str());
     }
     startTime = std::chrono::high_resolution_clock::now();
-    ret = ioctl(event.fd, PERF_EVENT_IOC_ENABLE, 0);
+    ret = ioctl(fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP);
     if (ret == -1) {
       std::stringstream errmsg;
-      errmsg << "PERF_EVENT_IOC_ENABLE failed for " << name << "! : " << errno
+      errmsg << "PERF_EVENT_IOC_ENABLE failed for " << fd << "! : " << errno
              << " " << DescribeError_IOCTL(errno);
       throw std::runtime_error(errmsg.str());
     }
-    //   if (read(event.fd, &event.prev, sizeof(uint64_t) * 3) !=
-    //       sizeof(uint64_t) * 3)
-    //     std::cerr << "Error reading counter " << names[i] << std::endl;
+  }
+}
+
+void print_readfmt(ReadFormat fmt) {
+  std::cout << "tr:" << std::endl;
+  std::cout << "nr: " << fmt.nr << std::endl;
+  std::cout << "values:" << std::endl;
+  for (auto i = 0; i < fmt.nr; i++) {
+    std::cout << "\tid: " << fmt.values[i].id << std::endl;
+    std::cout << "\tvalue: " << fmt.values[i].value << std::endl;
   }
 }
 
 void PerfEvent::StopCounters() {
-  for (unsigned i = 0; i < events.size(); i++) {
-    auto& event = events[i];
-    auto ret = ioctl(event.fd, PERF_EVENT_IOC_DISABLE, 0);
+  // for (unsigned i = 0; i < events.size(); ++i) {
+  //   // auto& event = events[i];
+  //   if (!events[i].isLeader) continue;
+  //   // this is a leader -> Stop this and the whole group gets stopped
+  //   auto ret = ioctl(events[i].fd, PERF_EVENT_IOC_DISABLE,
+  //   PERF_IOC_FLAG_GROUP); if (ret == -1) {
+  //     std::stringstream errmsg;
+  //     errmsg << "PERF_EVENT_IOC_DISABLE failed for " << names[i]
+  //            << "! : " << errno << " " << DescribeError_IOCTL(errno);
+  //     throw std::runtime_error(errmsg.str());
+  //   }
+  //   stopTime = std::chrono::high_resolution_clock::now();
+
+  //   // temp structure allocation to read things
+  //   ReadFormat tmp;
+  //   ret = read(events[i].fd, &tmp, sizeof(tmp));
+  //   if (ret < 0) {
+  //     std::stringstream errmsg;
+  //     errmsg << "Read() error: " << errno << ": " << strerror(errno)
+  //            << std::endl;
+  //     throw std::runtime_error(errmsg.str());
+  //   }
+  //   tmp.print();
+
+  //   // we read the counters, now assign them
+  //   for (int j = 0; j < events.size(); j++) {
+  //     if (events[j].leaderFD == events[i].fd) {
+  //       // this event is from this group -> find it and allocate
+  //       // the counter with the correct id
+  //       for (int k = 0; k < tmp.nr; k++) {
+  //         if (tmp.values[k].id == events[j].id) {
+  //           // set up the event
+  //           events[j].SetData(tmp.values[k].value, tmp.te, tmp.tr);
+  //           // we're done, exit
+  //           break;
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
+  for (auto& fd : leaderFDs) {
+    auto ret = ioctl(fd, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP);
     if (ret == -1) {
       std::stringstream errmsg;
-      errmsg << "PERF_EVENT_IOC_DISABLE failed for " << names[i]
-             << "! : " << errno << " " << DescribeError_IOCTL(errno);
+      errmsg << "PERF_EVENT_IOC_DISABLE failed for " << fd << "! : " << errno
+             << " " << DescribeError_IOCTL(errno);
       throw std::runtime_error(errmsg.str());
     }
-    if (read(event.fd, &event.data, sizeof(uint64_t) * 3) !=
-        sizeof(uint64_t) * 3)
-      std::cerr << "Error reading counter " << names[i] << std::endl;
     stopTime = std::chrono::high_resolution_clock::now();
+
+    ReadFormat tmp;
+    ret = read(fd, &tmp, sizeof(tmp));
+    if (ret < 0) {
+      std::stringstream errmsg;
+      errmsg << "Read() error: " << errno << ": " << strerror(errno)
+             << std::endl;
+      throw std::runtime_error(errmsg.str());
+    }
+    // print_readfmt(tmp);
+
+    for (int j = 0; j < events.size(); j++) {
+      if (events[j].leaderFD == fd) {
+        // this event is from this group -> find it and allocate
+        // the counter with the correct id
+        for (int k = 0; k < tmp.nr; k++) {
+          if (tmp.values[k].id == events[j].id) {
+            // set up the event
+            events[j].SetData(tmp.values[k].value);
+            // we're done, exit
+            break;
+          }
+        }
+      }
+    }
   }
 }
 
-long double PerfEvent::GetCounter(const std::string& name) {
+uint64_t PerfEvent::GetCounter(const std::string& name) {
   for (size_t i = 0; i < events.size(); i++)
     if (names[i] == name) return events[i].readCounter();
   return -1;
 }
 
-std::vector<EventType> PerfEvent::GetReport(long double scaleFactor = 1.0,
-                                            bool overheadCorrection = false) {
+std::vector<EventType> PerfEvent::GetReport(bool overheadCorrection = false) {
   std::vector<EventType> report(names.size() + 1);
   for (size_t i = 0; i < report.size() - 1; ++i) {
     std::string name = names[i];
-    long double count = GetCounter(names[i]) / scaleFactor;
+    auto count = GetCounter(names[i]);
     report[i].SetName(name);
     report[i].SetCount(count);
   }
@@ -146,7 +251,8 @@ std::vector<EventType> PerfEvent::GetReport(long double scaleFactor = 1.0,
 
 void PerfEvent::PrintReport() {
   for (size_t i = 0; i < names.size(); ++i) {
-    std::cout << std::format("{} : {}", names[i], GetCounter(names[i]))
+    std::cout << std::format("{} : {}", names[i],
+                             (long long)GetCounter(names[i]))
               << std::endl;
   }
   return;
@@ -155,7 +261,7 @@ void PerfEvent::PrintReport() {
 void PerfEvent::PrintReport(std::vector<EventType> report) {
   for (size_t i = 0; i < report.size(); ++i) {
     std::cout << std::format("{} : {}", report[i].GetName(),
-                             report[i].GetCount())
+                             (long long)report[i].GetCount())
               << std::endl;
   }
   return;
@@ -169,28 +275,51 @@ PerfEvent::PerfEvent() {
 
   int dummy = -1;
   RegisterCounter("HW-instructions"   , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS                , USER);
-  RegisterCounter("CPU-cycles"        , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES                  , USER);
-  RegisterCounter("Branch-instuctions", dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS         , USER);
-  RegisterCounter("Branch-misses"     , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES               , USER);
-  RegisterCounter("Bus-cycles"        , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES                  , USER);
-  RegisterCounter("Stall-frontend"    , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND     , USER);
-  RegisterCounter("Stall-backend"     , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND      , USER);
-  RegisterCounter("L1d-read-miss"     , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_MISS_R    , USER);
-  RegisterCounter("L1d-write-miss"    , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_MISS_W    , USER);
-  RegisterCounter("L1d-read-access"   , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_ACCESS_R  , USER);
-  RegisterCounter("L1d-write-access"  , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_ACCESS_W  , USER);
-  RegisterCounter("L1i-read-miss"     , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_MISS_R    , USER);
-  RegisterCounter("L1i-write-miss"    , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_MISS_W    , USER);
-  RegisterCounter("L1i-read-access"   , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_ACCESS_R  , USER);
-  RegisterCounter("L1i-write-access"  , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_ACCESS_W  , USER);
-  RegisterCounter("LLC-read-miss"     , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_MISS_R    , USER);
-  RegisterCounter("LLC-write-miss"    , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_MISS_W    , USER);
-  RegisterCounter("LLC-read-access"   , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_ACCESS_R  , USER);
-  RegisterCounter("LLC-write-access"  , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_ACCESS_W  , USER);
-  RegisterCounter("Pagefaults-total"  , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS                 , USER);
-  RegisterCounter("Pagefaults-maj"    , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ             , USER);
-  RegisterCounter("Pagefaults-min"    , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN             , USER);
-  RegisterCounter("Alignment-faults"  , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS            , USER);
+  dummy = -1;
+  RegisterCounter("CPU-cycles"        , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES                  , USER); 
+  dummy = -1;
+  RegisterCounter("Branch-instuctions", dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS         , USER); 
+  dummy = -1;
+  RegisterCounter("Branch-misses"     , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES               , USER); 
+  dummy = -1;
+  RegisterCounter("Bus-cycles"        , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES                  , USER); 
+  dummy = -1;
+  RegisterCounter("Stall-frontend"    , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND     , USER); 
+  dummy = -1;
+  RegisterCounter("Stall-backend"     , dummy, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND      , USER); 
+  dummy = -1;
+  RegisterCounter("L1d-read-miss"     , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_MISS_R    , USER); 
+  dummy = -1;
+  RegisterCounter("L1d-write-miss"    , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_MISS_W    , USER); 
+  dummy = -1;
+  RegisterCounter("L1d-read-access"   , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_ACCESS_R  , USER); 
+  dummy = -1;
+  RegisterCounter("L1d-write-access"  , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1D | CACHE_ACCESS_W  , USER); 
+  dummy = -1;
+  RegisterCounter("L1i-read-miss"     , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_MISS_R    , USER); 
+  dummy = -1;
+  RegisterCounter("L1i-write-miss"    , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_MISS_W    , USER); 
+  dummy = -1;
+  RegisterCounter("L1i-read-access"   , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_ACCESS_R  , USER); 
+  dummy = -1;
+  RegisterCounter("L1i-write-access"  , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_L1I | CACHE_ACCESS_W  , USER); 
+  dummy = -1;
+  RegisterCounter("LLC-read-miss"     , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_MISS_R    , USER); 
+  dummy = -1;
+  RegisterCounter("LLC-write-miss"    , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_MISS_W    , USER); 
+  dummy = -1;
+  RegisterCounter("LLC-read-access"   , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_ACCESS_R  , USER); 
+  dummy = -1;
+  RegisterCounter("LLC-write-access"  , dummy, PERF_TYPE_HW_CACHE, PERF_COUNT_HW_CACHE_LL  | CACHE_ACCESS_W  , USER); 
+  dummy = -1;
+  RegisterCounter("Pagefaults-total"  , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS                 , USER); 
+  dummy = -1;
+  RegisterCounter("Pagefaults-maj"    , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ             , USER); 
+  dummy = -1;
+  RegisterCounter("Pagefaults-min"    , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN             , USER); 
+  dummy = -1;
+  RegisterCounter("Alignment-faults"  , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS            , USER); 
+  dummy = -1;
   RegisterCounter("CPU-migrations"    , dummy, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS              , USER);
 
   // clang-format on
@@ -199,7 +328,7 @@ PerfEvent::PerfEvent() {
 }
 
 PerfEvent::PerfEvent(const std::string& configFile) {
-  ConstructTypeMap();
+  if (typeMap.empty()) ConstructTypeMap();
   ReadCounterList(configFile);
 }
 
@@ -212,7 +341,7 @@ PerfEvent::~PerfEvent() {
 std::vector<EventType> PerfEvent::GetOverhead() {
   StartCounters();
   StopCounters();
-  return GetReport(1.0, false);
+  return GetReport(false);
 }
 
 void PerfEvent::ConstructTypeMap() {
@@ -242,7 +371,6 @@ void PerfEvent::ConstructTypeMap() {
   typeMap["PERF_COUNT_SW_PAGE_FAULTS_MAJ"] = PERF_COUNT_SW_PAGE_FAULTS_MAJ;
   typeMap["PERF_COUNT_SW_ALIGNMENT_FAULTS"] = PERF_COUNT_SW_ALIGNMENT_FAULTS;
   typeMap["PERF_COUNT_SW_EMULATION_FAULTS"] = PERF_COUNT_SW_EMULATION_FAULTS;
-  typeMap["PERF_COUNT_SW_DUMMY"] = PERF_COUNT_SW_DUMMY;
   typeMap["PERF_COUNT_SW_BPF_OUTPUT"] = PERF_COUNT_SW_BPF_OUTPUT;
   typeMap["PERF_COUNT_SW_CGROUP_SWITCHES"] = PERF_COUNT_SW_CGROUP_SWITCHES;
 
@@ -303,6 +431,8 @@ int PerfEvent::TypeLookup(const std::string& query) {
   try {
     if (query.substr(0, 2) == "0x" || query.substr(0, 2) == "0X")
       return std::stoi(query.substr(2), nullptr, 16);
+    else
+      return std::stoi(query.substr(2), nullptr, 10);
   } catch (std::invalid_argument&) {
     return -1;
   } catch (std::out_of_range&) {
@@ -355,4 +485,50 @@ void PerfEvent::ReadCounterList(const std::string& filename) {
     throw std::runtime_error(
         "No counter is available. Please check your code/system!");
   }
+}
+
+void PerfEvent::ReadEnvConfig(bool configType, bool& foundStatus,
+                              std::string& varVal) {
+  const char* value = (configType) ? getenv("KPROF_COUNTER_FILE")
+                                   : getenv("KPROF_COUNTER_CONF");
+  if (!value) {
+    foundStatus = false;
+    varVal = std::string("");
+    return;
+  }
+
+  foundStatus = true;
+  varVal = std::string(value);
+  return;
+}
+
+void PerfEvent::ParseEnvConfig(std::string& parsedEnv) {
+  // // we are sure that the user has input a string into the environment and we
+  // // need to find it syntax: name0-T0:VAL0,name0-T1:VAL1...
+  // // this function must be called only AFTER typeMap exists!
+  // std::istringstream ss(parsedEnv);
+  // std::string token;
+  // std::vector<std::string> configList;
+
+  // std::vector<std::string> parsedList;
+  // while (std::getline(ss, token, ',')) {
+  //   configList.push_back(token);
+  // }
+
+  // std::unordered_map<std::string, std::string> miniTypeMap;
+
+  // // now we can parse each config
+  // for (auto& token : configList) {
+  //   // token structure is name-T:VAL, name is a label str, T a type str and
+  //   VAL
+  //   // is a value str
+  //   int type = -1, id = -1;
+  //   std::string name, tmp;
+  //   ss.clear();  // clear and reuse ss
+  //   ss.str("");
+  //   ss.str(token);
+
+  //   if
+
+  // }
 }

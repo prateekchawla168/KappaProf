@@ -16,6 +16,10 @@ set(BLIS_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/TPL/BLIS)
 set(BLIS_INCLUDE_DIR ${BLIS_PREFIX}/include)
 set(BLIS_LIBRARY ${BLIS_PREFIX}/lib/libblis.so)
 
+set(FFTW_PREFIX ${CMAKE_CURRENT_SOURCE_DIR}/TPL/FFTW)
+set(FFTW_INCLUDE_DIR ${FFTW_PREFIX}/include)
+set(FFTW_LIBRARY ${FFTW_PREFIX}/lib/libfftw3.a)
+
 if(NOT ((EXISTS "${BLIS_LIBRARY}") AND (EXISTS "${BLIS_INCLUDE_DIR}") AND (IS_DIRECTORY "${BLIS_INCLUDE_DIR}")))
     file(GLOB_RECURSE INCLUDE_FILES "${BLIS_INCLUDE_DIR}/*")
     if(NOT INCLUDE_FILES)
@@ -34,9 +38,27 @@ if(NOT ((EXISTS "${BLIS_LIBRARY}") AND (EXISTS "${BLIS_INCLUDE_DIR}") AND (IS_DI
     endif()
 endif()
 
+if(NOT ((EXISTS "${FFTW_LIBRARY}") AND (EXISTS "${FFTW_INCLUDE_DIR}") AND (IS_DIRECTORY "${FFTW_INCLUDE_DIR}")))
+    file(GLOB_RECURSE INCLUDE_FILES "${FFTW_INCLUDE_DIR}/*")
+    if(NOT INCLUDE_FILES)
+
+        include(ExternalProject)
+        ExternalProject_Add(
+            FFTW
+            URL https://www.fftw.org/fftw-3.3.10.tar.gz
+            DOWNLOAD_EXTRACT_TIMESTAMP false
+            BUILD_IN_SOURCE true
+            CONFIGURE_COMMAND ./configure --prefix=${FFTW_PREFIX}
+            BUILD_COMMAND make -j8
+            INSTALL_COMMAND make install
+        )
+    endif()
+endif()
+
 include_directories(../include)
 include_directories(include)
 include_directories(${BLIS_INCLUDE_DIR})
+include_directories(${FFTW_INCLUDE_DIR})
 
 
 
@@ -52,5 +74,6 @@ set(DEMO_SOURCES
 
 add_executable(${TARGET_NAME}_demo ${DEMO_SOURCES} ${DEMO_HEADERS})
 target_link_libraries(${TARGET_NAME}_demo ${BLIS_LIBRARY})
+target_link_libraries(${TARGET_NAME}_demo ${FFTW_LIBRARY})
 
 
