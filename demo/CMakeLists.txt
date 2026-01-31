@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
-project(KernelProfilerDemo
-    DESCRIPTION "Demo for the KernelProfiler Library"
+project(kPRofDemo
+    DESCRIPTION "Demo for the kProf Library"
     LANGUAGES CXX
 )
 

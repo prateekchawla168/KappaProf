@@ -23,7 +23,7 @@ set(CMAKE_BUILD_TYPE MinSizeRel)
 
 set(CMAKE_CXX_FLAGS "-Os")
 
-set(TARGET_NAME KernelProfiler)
+set(TARGET_NAME KProf)
 
 add_library(${TARGET_NAME} ${SOURCES} ${HEADERS})
 
