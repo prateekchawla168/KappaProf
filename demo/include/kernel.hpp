@@ -5,7 +5,9 @@
 #include "fftw3.h"
 #include "profiler.hpp"
 
-void dgemm_kernel(PerfEvent& monitor, size_t& timer) {
+using namespace KProf;
+
+void dgemm_kernel(KProfEvent& monitor, size_t& timer) {
   // "borrowed" with minimal mods from BLIS typed API examples
 
   volatile dim_t m, n, k;
@@ -85,7 +87,7 @@ void dgemm_kernel(PerfEvent& monitor, size_t& timer) {
   return;
 }
 
-void ddot_kernel(PerfEvent& monitor, size_t& timer) {
+void ddot_kernel(KProfEvent& monitor, size_t& timer) {
   // borrowed pretty much exactly from BLIS docs
   double* x;
   double* y;
@@ -124,7 +126,7 @@ void ddot_kernel(PerfEvent& monitor, size_t& timer) {
   return;
 }
 
-void fftw_kernel(PerfEvent& monitor, size_t& timer) {
+void fftw_kernel(KProfEvent& monitor, size_t& timer) {
   // first get a random vector
 
   dim_t n = 512;
@@ -160,7 +162,7 @@ void fftw_kernel(PerfEvent& monitor, size_t& timer) {
 }
 
 // change this to kProfEvent
-void sum_kernel(PerfEvent& monitor, size_t& timer) {
+void sum_kernel(KProfEvent& monitor, size_t& timer) {
   volatile int sum = 0;
   {
     monitor.StartCounters();
@@ -181,7 +183,7 @@ void sum_kernel(PerfEvent& monitor, size_t& timer) {
   return;
 }
 
-void dynamic_sum_kernel(PerfEvent& monitor, size_t& timer, size_t j) {
+void dynamic_sum_kernel(KProfEvent& monitor, size_t& timer, size_t j) {
   volatile int sum = 0;
   {
     monitor.StartCounters();
@@ -202,7 +204,7 @@ void dynamic_sum_kernel(PerfEvent& monitor, size_t& timer, size_t j) {
   return;
 }
 
-void dynamic_dgemm_kernel(PerfEvent& monitor, size_t& timer, size_t ndim) {
+void dynamic_dgemm_kernel(KProfEvent& monitor, size_t& timer, size_t ndim) {
   // "borrowed" with minimal mods from BLIS typed API examples
 
   volatile dim_t m, n, k;

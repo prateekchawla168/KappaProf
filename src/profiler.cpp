@@ -15,10 +15,11 @@
 #define CACHE_MISS_P    ((PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16))
 #define CACHE_ACCESS_P  ((PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16))
 // clang-format on
+namespace KProf {
 
-void PerfEvent::RegisterCounter(const std::string& name, int& leader_FD,
-                                uint64_t type, uint64_t eventID,
-                                EventDomain domain = ALL) {
+void KProfEvent::RegisterCounter(const std::string& name, int& leader_FD,
+                                 uint64_t type, uint64_t eventID,
+                                 EventDomain domain = ALL) {
   auto event = Event();
   auto& pe = event.pe;
   memset(&pe, 0, sizeof(struct perf_event_attr));
@@ -91,7 +92,7 @@ void PerfEvent::RegisterCounter(const std::string& name, int& leader_FD,
   }
 }
 
-void PerfEvent::StartCounters() {
+void KProfEvent::StartCounters() {
   // could use a std::for_each but we need the index.
   // TODO: Define an enumerate()?
   // for (size_t i = 0; i < events.size(); i++) {
@@ -145,7 +146,7 @@ void print_readfmt(ReadFormat fmt) {
   }
 }
 
-void PerfEvent::StopCounters() {
+void KProfEvent::StopCounters() {
   // for (unsigned i = 0; i < events.size(); ++i) {
   //   // auto& event = events[i];
   //   if (!events[i].isLeader) continue;
@@ -224,14 +225,15 @@ void PerfEvent::StopCounters() {
   }
 }
 
-uint64_t PerfEvent::GetCounter(const std::string& name) {
+uint64_t KProfEvent::GetCounter(const std::string& name) {
   for (size_t i = 0; i < events.size(); i++)
     if (names[i] == name) return events[i].readCounter();
   return -1;
 }
 
-std::vector<EventType> PerfEvent::GetReport(bool overheadCorrection = false) {
-  std::vector<EventType> report(names.size() + 1);
+std::vector<KProfCounter> KProfEvent::GetReport(
+    bool overheadCorrection = false) {
+  std::vector<KProfCounter> report(names.size() + 1);
   for (size_t i = 0; i < report.size() - 1; ++i) {
     std::string name = names[i];
     auto count = GetCounter(names[i]);
@@ -249,7 +251,7 @@ std::vector<EventType> PerfEvent::GetReport(bool overheadCorrection = false) {
   return report;
 }
 
-void PerfEvent::PrintReport() {
+void KProfEvent::PrintReport() {
   for (size_t i = 0; i < names.size(); ++i) {
     std::cout << std::format("{} : {}", names[i],
                              (long long)GetCounter(names[i]))
@@ -258,7 +260,7 @@ void PerfEvent::PrintReport() {
   return;
 }
 
-void PerfEvent::PrintReport(std::vector<EventType> report) {
+void KProfEvent::PrintReport(std::vector<KProfCounter> report) {
   for (size_t i = 0; i < report.size(); ++i) {
     std::cout << std::format("{} : {}", report[i].GetName(),
                              (long long)report[i].GetCount())
@@ -267,7 +269,7 @@ void PerfEvent::PrintReport(std::vector<EventType> report) {
   return;
 }
 
-PerfEvent::PerfEvent() {
+KProfEvent::KProfEvent() {
   // first, check the environment config
 
   std::string parsedEnvString;
@@ -345,24 +347,24 @@ PerfEvent::PerfEvent() {
   return;
 }
 
-PerfEvent::PerfEvent(const std::string& configFile) {
+KProfEvent::KProfEvent(const std::string& configFile) {
   if (typeMap.empty()) ConstructTypeMap();
   ReadCounterList(configFile);
 }
 
-PerfEvent::~PerfEvent() {
+KProfEvent::~KProfEvent() {
   for (auto& event : events) {
     close(event.fd);
   }
 }
 
-std::vector<EventType> PerfEvent::GetOverhead() {
+std::vector<KProfCounter> KProfEvent::GetOverhead() {
   StartCounters();
   StopCounters();
   return GetReport(false);
 }
 
-void PerfEvent::ConstructTypeMap() {
+void KProfEvent::ConstructTypeMap() {
   // clang-format off
   typeMap["PERF_TYPE_HARDWARE"] = PERF_TYPE_HARDWARE;
   typeMap["PERF_TYPE_SOFTWARE"] = PERF_TYPE_SOFTWARE;
@@ -439,7 +441,7 @@ void PerfEvent::ConstructTypeMap() {
   return;
 }
 
-int PerfEvent::TypeLookup(const std::string& query) {
+int KProfEvent::TypeLookup(const std::string& query) {
   auto it = typeMap.find(query);
   if (it != typeMap.end()) {
     return it->second;
@@ -460,7 +462,7 @@ int PerfEvent::TypeLookup(const std::string& query) {
   return -1;
 }
 
-void PerfEvent::ReadCounterList(const std::string& filename) {
+void KProfEvent::ReadCounterList(const std::string& filename) {
   // Event file MUST be a csv file with the format
   // event_title,EVENT_TYPE,EVENT_NAME
 
@@ -505,8 +507,8 @@ void PerfEvent::ReadCounterList(const std::string& filename) {
   }
 }
 
-void PerfEvent::ReadEnvConfig(bool configType, bool& foundStatus,
-                              std::string& varVal) {
+void KProfEvent::ReadEnvConfig(bool configType, bool& foundStatus,
+                               std::string& varVal) {
   const char* value = (configType) ? getenv("KPROF_COUNTER_FILE")
                                    : getenv("KPROF_COUNTER_CONF");
   if (!value) {
@@ -539,7 +541,7 @@ int PerfTypeLookup(std::string& query) {
   }
 }
 
-void PerfEvent::ParseEnvConfig(std::string& parsedEnv) {
+void KProfEvent::ParseEnvConfig(std::string& parsedEnv) {
   // we are sure that the user has input a string here and we
   // need to find it syntax: name0,T0:VAL0;name0,T1:VAL1;...
   std::istringstream ss(parsedEnv);
@@ -600,3 +602,5 @@ void PerfEvent::ParseEnvConfig(std::string& parsedEnv) {
         "No counter is available. Please check your code/system!");
   }
 }
+
+};  // namespace KProf

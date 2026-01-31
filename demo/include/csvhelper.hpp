@@ -5,8 +5,9 @@
 #include <string>
 
 #include "profiler.hpp"
+using namespace KProf;
 
-void DumpCSV(std::string filename, std::vector<EventType>& report) {
+void DumpCSV(std::string filename, std::vector<KProfCounter>& report) {
   std::ofstream csvfile;
   csvfile.open(filename, std::ios::app);
 

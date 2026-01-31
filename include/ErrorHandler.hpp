@@ -3,6 +3,7 @@
 #include <cstring>  // for strerror
 #include <string>
 
+namespace KProf {
 // Handles enumeration and display of perf errors
 
 std::string DescribeError(size_t errnum) {
@@ -149,3 +150,5 @@ std::string DescribeError_IOCTL(int errnum) {
 
   return res;
 }
+
+};  // namespace KProf

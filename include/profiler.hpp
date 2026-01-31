@@ -16,18 +16,19 @@
 #include <unordered_map>
 #include <vector>
 
-class EventType {
+namespace KProf {
+class KProfCounter {
  private:
   std::pair<std::string, uint64_t> item;
 
  public:
   /// we need to copy the name!
-  EventType(std::string _name, uint64_t _count) {
+  KProfCounter(std::string _name, uint64_t _count) {
     item.first = _name;
     item.second = _count;
   }
 
-  EventType() {
+  KProfCounter() {
     item.first = "";
     item.second = -1;
   }
@@ -51,7 +52,7 @@ struct ReadFormat {
   } values[10];
 };
 
-class PerfEvent {
+class KProfEvent {
  public:
   struct Event {
     struct EventDataFormat {
@@ -102,19 +103,19 @@ class PerfEvent {
         .count();
   }
 
-  std::vector<EventType> GetReport(bool);  // todo: de-idiotify
-  std::vector<EventType> GetReport() { return this->GetReport(false); };
+  std::vector<KProfCounter> GetReport(bool);  // todo: de-idiotify
+  std::vector<KProfCounter> GetReport() { return this->GetReport(false); };
   void PrintReport();
-  void PrintReport(std::vector<EventType>);
+  void PrintReport(std::vector<KProfCounter>);
 
-  PerfEvent();
-  PerfEvent(const std::string&);
-  ~PerfEvent();
+  KProfEvent();
+  KProfEvent(const std::string&);
+  ~KProfEvent();
 
  private:
   void ConstructTypeMap();
   int TypeLookup(const std::string&);
-  std::vector<EventType> GetOverhead();
+  std::vector<KProfCounter> GetOverhead();
   void ReadCounterList(const std::string&);
   void ReadEnvConfig(bool, bool&, std::string&);
   void ParseEnvConfig(std::string&);
@@ -127,3 +128,5 @@ class PerfEvent {
   std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
   std::chrono::time_point<std::chrono::high_resolution_clock> stopTime;
 };
+
+};  // namespace KProf
