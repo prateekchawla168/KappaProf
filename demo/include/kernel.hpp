@@ -24,9 +24,9 @@ void dgemm_kernel(PerfEvent& monitor, size_t& timer) {
   double two = 2.0;
 
   // Create some matrix and vector operands to work with.
-  m = 512;
-  n = 512;
-  k = 512;
+  m = 32;
+  n = 32;
+  k = 32;
   rsc = 1;
   csc = m;
   rsa = 1;
@@ -53,17 +53,6 @@ void dgemm_kernel(PerfEvent& monitor, size_t& timer) {
   // bli_dprintm("c: initial value", m, n, c, rsc, csc, "% 4.3f", "");
 
   {
-    monitor.StartCounters();
-    // c := beta * c + alpha * a * b, where 'a', 'b', and 'c' are general
-    bli_dgemm(BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, m, n, k, &alpha, a, rsa,
-              csa, b, rsb, csb, &beta, c, rsc, csc);
-    monitor.StopCounters();
-  }
-
-  bli_dsetm(BLIS_NO_CONJUGATE, 0, BLIS_NONUNIT_DIAG, BLIS_DENSE, m, n, &two, c,
-            rsc, csc);
-
-  {
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // c := beta * c + alpha * a * b, where 'a', 'b', and 'c' are general
@@ -74,6 +63,16 @@ void dgemm_kernel(PerfEvent& monitor, size_t& timer) {
     timer = std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime -
                                                                  startTime)
                 .count();
+  }
+  bli_dsetm(BLIS_NO_CONJUGATE, 0, BLIS_NONUNIT_DIAG, BLIS_DENSE, m, n, &two, c,
+            rsc, csc);
+
+  {
+    monitor.StartCounters();
+    // c := beta * c + alpha * a * b, where 'a', 'b', and 'c' are general
+    bli_dgemm(BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, m, n, k, &alpha, a, rsa,
+              csa, b, rsb, csb, &beta, c, rsc, csc);
+    monitor.StopCounters();
   }
 
   // bli_dprintm("c: after gemm", m, n, c, rsc, csc, "% 4.3f", "");
@@ -102,14 +101,7 @@ void ddot_kernel(PerfEvent& monitor, size_t& timer) {
   bli_drandv(n, x, 1);
   bli_drandv(n, y, 1);
 
-  {
-    monitor.StartCounters();
-    // z = x \dot y
-    bli_ddotv(BLIS_NO_CONJUGATE, BLIS_NO_CONJUGATE, n, x, 1, y, 1, &z);
-    monitor.StopCounters();
-  }
-
-  // do this again, but without monitoring
+  // do this, but without monitoring
   {
     auto startTime = std::chrono::high_resolution_clock::now();
     bli_ddotv(BLIS_NO_CONJUGATE, BLIS_NO_CONJUGATE, n, x, 1, y, 1, &z);
@@ -118,6 +110,13 @@ void ddot_kernel(PerfEvent& monitor, size_t& timer) {
     timer = std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime -
                                                                  startTime)
                 .count();
+  }
+
+  {
+    monitor.StartCounters();
+    // z = x \dot y
+    bli_ddotv(BLIS_NO_CONJUGATE, BLIS_NO_CONJUGATE, n, x, 1, y, 1, &z);
+    monitor.StopCounters();
   }
   free(x);
   free(y);
@@ -140,12 +139,6 @@ void fftw_kernel(PerfEvent& monitor, size_t& timer) {
   bli_zrandv(n, x, 1);
 
   {
-    monitor.StartCounters();
-    fftw_execute(plan);
-    monitor.StopCounters();
-  }
-
-  {
     auto startTime = std::chrono::high_resolution_clock::now();
     fftw_execute(plan);
     auto stopTime = std::chrono::high_resolution_clock::now();
@@ -155,6 +148,11 @@ void fftw_kernel(PerfEvent& monitor, size_t& timer) {
                 .count();
   }
 
+  {
+    monitor.StartCounters();
+    fftw_execute(plan);
+    monitor.StopCounters();
+  }
   fftw_destroy_plan(plan);
   free(x);
   free(y);
@@ -200,6 +198,86 @@ void dynamic_sum_kernel(PerfEvent& monitor, size_t& timer, size_t j) {
                                                                  startTime)
                 .count();
   }
+
+  return;
+}
+
+void dynamic_dgemm_kernel(PerfEvent& monitor, size_t& timer, size_t ndim) {
+  // "borrowed" with minimal mods from BLIS typed API examples
+
+  volatile dim_t m, n, k;
+  inc_t rsa, csa;
+  inc_t rsb, csb;
+  inc_t rsc, csc;
+
+  double* a;
+  double* b;
+  double* c;
+  double alpha, beta;
+
+  // Initialize some basic constants.
+  double zero = 0.0;
+  double one = 1.0;
+  double two = 2.0;
+
+  // Create some matrix and vector operands to work with.
+  m = ndim;
+  n = ndim;
+  k = ndim;
+  rsc = 1;
+  csc = m;
+  rsa = 1;
+  csa = m;
+  rsb = 1;
+  csb = k;
+  c = (double*)std::malloc(m * n * sizeof(double));
+  a = (double*)std::malloc(m * k * sizeof(double));
+  b = (double*)std::malloc(k * n * sizeof(double));
+
+  // Set the scalars to use.
+  alpha = 0.707;
+  beta = 0.707;
+
+  // Initialize the matrix operands.
+  bli_drandm(0, BLIS_DENSE, m, k, a, rsa, csa);
+  bli_dsetm(BLIS_NO_CONJUGATE, 0, BLIS_NONUNIT_DIAG, BLIS_DENSE, k, n, &one, b,
+            rsb, csb);
+  bli_dsetm(BLIS_NO_CONJUGATE, 0, BLIS_NONUNIT_DIAG, BLIS_DENSE, m, n, &two, c,
+            rsc, csc);
+
+  // bli_dprintm("a: randomized", m, k, a, rsa, csa, "% 4.3f", "");
+  // bli_dprintm("b: set to 1.0", k, n, b, rsb, csb, "% 4.3f", "");
+  // bli_dprintm("c: initial value", m, n, c, rsc, csc, "% 4.3f", "");
+  {
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    // c := beta * c + alpha * a * b, where 'a', 'b', and 'c' are general
+    bli_dgemm(BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, m, n, k, &alpha, a, rsa,
+              csa, b, rsb, csb, &beta, c, rsc, csc);
+    auto stopTime = std::chrono::high_resolution_clock::now();
+
+    timer = std::chrono::duration_cast<std::chrono::nanoseconds>(stopTime -
+                                                                 startTime)
+                .count();
+  }
+
+  {
+    monitor.StartCounters();
+    // c := beta * c + alpha * a * b, where 'a', 'b', and 'c' are general
+    bli_dgemm(BLIS_NO_TRANSPOSE, BLIS_NO_TRANSPOSE, m, n, k, &alpha, a, rsa,
+              csa, b, rsb, csb, &beta, c, rsc, csc);
+    monitor.StopCounters();
+  }
+
+  bli_dsetm(BLIS_NO_CONJUGATE, 0, BLIS_NONUNIT_DIAG, BLIS_DENSE, m, n, &two, c,
+            rsc, csc);
+
+  // bli_dprintm("c: after gemm", m, n, c, rsc, csc, "% 4.3f", "");
+
+  // Free the memory obtained via malloc().
+  std::free(a);
+  std::free(b);
+  std::free(c);
 
   return;
 }
