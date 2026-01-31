@@ -5,7 +5,7 @@
 
 #include "csvhelper.hpp"
 #include "kernel.hpp"
-#include "profiler.hpp"
+#include "kprof.hpp"
 
 using namespace KProf;
 

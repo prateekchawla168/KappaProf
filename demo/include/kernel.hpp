@@ -3,7 +3,7 @@
 
 #include "blis.h"
 #include "fftw3.h"
-#include "profiler.hpp"
+#include "kprof.hpp"
 
 using namespace KProf;
 

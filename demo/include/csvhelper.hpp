@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 
-#include "profiler.hpp"
+#include "kprof.hpp"
 using namespace KProf;
 
 void DumpCSV(std::string filename, std::vector<KProfCounter>& report) {
