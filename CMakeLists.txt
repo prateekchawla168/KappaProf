@@ -20,7 +20,8 @@ set(HEADERS
 # tmp stuff for now, delete later
 set(CMAKE_BUILD_TYPE MinSizeRel)
 
-# set(CMAKE_CXX_FLAGS "-fsanitize=undefined")
+
+set(CMAKE_CXX_FLAGS "-Os")
 
 set(TARGET_NAME KernelProfiler)
 
