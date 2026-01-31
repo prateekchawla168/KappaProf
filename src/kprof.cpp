@@ -1,4 +1,4 @@
-#include "profiler.hpp"
+#include "kprof.hpp"
 
 #include <algorithm>  // for std::find
 #include <cstdlib>
