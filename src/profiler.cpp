@@ -41,7 +41,7 @@ void PerfEvent::RegisterCounter(const std::string& name, int& leader_FD,
   event.fd = static_cast<int>(
       syscall(SYS_perf_event_open, &event.pe, 0, -1, leader_FD, 0));
   if (event.fd < 0) {
-    if (errno == 22) {
+    if ((errno == 22) || (errno == ENOSPC)) {
       std::cerr << "Could not open " << name
                 << " with the specified leader. "
                    "Re-attempting as leader."
@@ -268,7 +268,25 @@ void PerfEvent::PrintReport(std::vector<EventType> report) {
 }
 
 PerfEvent::PerfEvent() {
-  // todo: lookup more counters in linux/perf_event.h
+  // first, check the environment config
+
+  std::string parsedEnvString;
+  bool found;
+  ReadEnvConfig(true, found, parsedEnvString);
+  switch (found) {
+    case true:
+      // we found a config file from the environment
+      ReadCounterList(parsedEnvString);
+      break;
+    case false:
+      // no env file, check for a list in the environment
+      ReadEnvConfig(false, found, parsedEnvString);
+      if (found) ParseEnvConfig(parsedEnvString);
+      break;
+  }
+  if (found) return;  // we did things we were meant to, leave.
+
+  // i can't find anything - default set should be initialized
 
   // prevent formatter from messing with this
   // clang-format off
@@ -462,8 +480,8 @@ void PerfEvent::ReadCounterList(const std::string& filename) {
 
     if (std::getline(ss, name, ',') && std::getline(ss, counterType, ',') &&
         std::getline(ss, counterSpec)) {
-      uint64_t type = TypeLookup(counterType);
-      uint64_t spec = TypeLookup(counterSpec);
+      int type = TypeLookup(counterType);
+      int spec = TypeLookup(counterSpec);
       if (type == -1) {
         std::cerr << "Invalid type specified in line " << line
                   << ". Ignoring counter." << std ::endl;
@@ -502,33 +520,83 @@ void PerfEvent::ReadEnvConfig(bool configType, bool& foundStatus,
   return;
 }
 
+inline void ShowErrForToken(std::string& token) {
+  std::cerr << "Invalid format in: " << token
+            << ". Ignoring counter on this system." << std::endl;
+}
+
+int PerfTypeLookup(std::string& query) {
+  if (query == "H") {
+    return PERF_TYPE_HARDWARE;
+  } else if (query == "S") {
+    return PERF_TYPE_SOFTWARE;
+  } else if (query == "C") {
+    return PERF_TYPE_HW_CACHE;
+  } else if (query == "R") {
+    return PERF_TYPE_RAW;
+  } else {
+    return -1;
+  }
+}
+
 void PerfEvent::ParseEnvConfig(std::string& parsedEnv) {
-  // // we are sure that the user has input a string into the environment and we
-  // // need to find it syntax: name0-T0:VAL0,name0-T1:VAL1...
-  // // this function must be called only AFTER typeMap exists!
-  // std::istringstream ss(parsedEnv);
-  // std::string token;
-  // std::vector<std::string> configList;
+  // we are sure that the user has input a string here and we
+  // need to find it syntax: name0,T0:VAL0;name0,T1:VAL1;...
+  std::istringstream ss(parsedEnv);
+  std::string token;
+  std::vector<std::string> configList;
 
-  // std::vector<std::string> parsedList;
-  // while (std::getline(ss, token, ',')) {
-  //   configList.push_back(token);
-  // }
+  std::vector<std::string> parsedList;
+  while (std::getline(ss, token, ';')) {
+    if (!token.empty()) configList.push_back(token);
+  }
 
-  // std::unordered_map<std::string, std::string> miniTypeMap;
+  // force only first counter to be leader
+  int leader = -1;
+  // now we can parse each config
+  for (auto& token : configList) {
+    // token structure is name,T:VAL;, name is a label str, T a type str and
+    // VAL is a value str
+    // find the comma
+    auto commapos = token.find(',');
+    if (commapos != std::string::npos) {
+      std::string name = token.substr(0, commapos);      // get name
+      std::string typeVal = token.substr(commapos + 1);  // the rest
 
-  // // now we can parse each config
-  // for (auto& token : configList) {
-  //   // token structure is name-T:VAL, name is a label str, T a type str and
-  //   VAL
-  //   // is a value str
-  //   int type = -1, id = -1;
-  //   std::string name, tmp;
-  //   ss.clear();  // clear and reuse ss
-  //   ss.str("");
-  //   ss.str(token);
+      auto colonpos = typeVal.find(':');
+      if (colonpos != std::string::npos) {
+        std::string typestr = typeVal.substr(0, colonpos);
+        std::string valuestr =
+            typeVal.substr(colonpos + 1);  // we have the value now
 
-  //   if
+        // now we can register the counter
+        int type = PerfTypeLookup(typestr);
+        int spec = TypeLookup(valuestr);
 
-  // }
+        if (type == -1) {
+          std::cerr << "Invalid type specified at " << token
+                    << ". Ignoring counter." << std ::endl;
+        } else if (spec == -1) {
+          std::cerr << "Invalid counter specified at " << token
+                    << ". Ignoring counter." << std ::endl;
+
+        } else {
+          // Attempt to initialize counter
+          RegisterCounter(name, leader, type, spec, USER);
+        }
+      } else {
+        ShowErrForToken(token);
+      }
+    } else {
+      ShowErrForToken(token);
+    }
+  }
+
+  // loop for counter checking has ended here
+  // After this loop, if no events remain, throw an error
+  if (events.size() == 0) {
+    names.resize(0);
+    throw std::runtime_error(
+        "No counter is available. Please check your code/system!");
+  }
 }
