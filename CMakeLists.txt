@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.22)
 project(KernelProfiler
     DESCRIPTION
     "A simple kernel profiling library written in C++"
-    LANGUAGES CXX)
+    LANGUAGES CXX
+    VERSION 0.1)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -25,7 +26,11 @@ set(CMAKE_CXX_FLAGS "-Os")
 
 set(TARGET_NAME KProf)
 
-add_library(${TARGET_NAME} ${SOURCES} ${HEADERS})
+add_library(${TARGET_NAME} SHARED ${SOURCES} ${HEADERS})
+
+set_target_properties(${TARGET_NAME} PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION 1)
 
 option(BUILD_DEMO "Build demo executable for the library" OFF)
 if(BUILD_DEMO)
