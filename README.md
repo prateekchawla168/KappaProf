@@ -1,4 +1,4 @@
-# $\kappa$Prof: A lightweight, fast kernel benchmarking library
+# κProf: A lightweight, fast kernel benchmarking library
 
 ## 0. Prerequisites
 
@@ -9,7 +9,7 @@
 
 ## 1. Building
 
-$\kappa$Prof uses the CMake build system. It is recommended to perform an out of tree build. It is assumed that the current directory is the source directory.
+κProf uses the CMake build system. It is recommended to perform an out of tree build. It is assumed that the current directory is the source directory.
 
 ```sh
 $ pwd
@@ -29,10 +29,10 @@ An optional demo is included in this code. In order to compile and run it, use t
 
 ## 2. Usage
 
-To include $\kappa$Prof in your source code, include the header `kprof.hpp`. This provides all the functionality in the `kProf` namespace.
+To include κProf in your source code, include the header `kprof.hpp`. This provides all the functionality in the `kProf` namespace.
 - To initialize a counter, use `kProf::KProfEvent <objectName>`. 
 - When instrumenting the code, use `<objectName>.StartCounters()` and `<objectName>.StopCounters()`.
-- Access and print reports with `<objectName>.GetReport(true)` and `<objectName>.PrintReport()`.  In case raw event counts are required (without $\kappa$Prof removing its overhead), pass `false` to `<objectName>.GetReport()`. To print a specific report, pass it as an argument to `<objectName>.PrintReport()`. 
+- Access and print reports with `<objectName>.GetReport(true)` and `<objectName>.PrintReport()`.  In case raw event counts are required (without κProf removing its overhead), pass `false` to `<objectName>.GetReport()`. To print a specific report, pass it as an argument to `<objectName>.PrintReport()`. 
 - In case the code is single-threaded, it is recommended to pin the resulting executable to a single core. `numactl` is recommended.
 - Counter information can be provided at runtime by:
   - Set the environment variable `KPROF_COUNTER_FILE` to a CSV file containing the counter information.
